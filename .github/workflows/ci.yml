@@ -1,0 +1,78 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-keys.outputs.key }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js 18.14
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.14'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get cache key
+        id: cache-keys
+        run: echo "::set-output name=key::$(npm config get cache)/$(arch)/$(node -v)"
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: node-modules
+          path: |
+            node_modules
+
+  lint:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download node_modules
+        uses: actions/download-artifact@v2
+        with:
+          name: node-modules
+          path: .
+
+      - name: Run linter
+        run: npm run lint
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download node_modules
+        uses: actions/download-artifact@v2
+        with:
+          name: node-modules
+          path: .
+
+      - name: Run tests
+        run: npm test
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download node_modules
+        uses: actions/download-artifact@v2
+        with:
+          name: node-modules
+          path: .
+
+      - name: Build
+        run: npm run build
