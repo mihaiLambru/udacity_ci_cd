@@ -1,0 +1,92 @@
+# name: Continuous Deployment
+
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'frontend/**'
+#   workflow_dispatch:
+
+# env:
+#   IMAGE_REPO_NAME: your-ecr-repo-name
+#   AWS_REGION: your-aws-region
+#   ECR_REGISTRY: your-aws-account-id.dkr.ecr.your-aws-region.amazonaws.com
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v2
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '18.14'
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Run tests
+#         run: npm test
+
+#   build_and_push:
+#     needs: test
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v2
+
+#       - name: Get short SHA
+#         id: sha
+#         run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+
+#       - name: Login to Amazon ECR
+#         id: login-ecr
+#         uses: aws-actions/amazon-ecr-login@v1
+
+#       - name: Build, tag, and push image to Amazon ECR
+#         env:
+#           IMAGE_TAG: ${{ steps.sha.outputs.sha }}
+#         run: |
+#           docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+#           docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
+#           docker push $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+#       - name: Output the image name to a file
+#         run: echo $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG > image_name.txt
+
+#       - name: Upload image name file as an artifact
+#         uses: actions/upload-artifact@v2
+#         with:
+#           name: image_name
+#           path: image_name.txt
+
+#   deploy:
+#     needs: build_and_push
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v2
+
+#       - name: Download image name file
+#         uses: actions/download-artifact@v2
+#         with:
+#           name: image_name
+#           path: .
+
+#       - name: Set up Kubeconfig
+#         uses: azure/setup-kubectl@v1
+
+#       - name: Login to ECR
+#         uses: aws-actions/amazon-ecr-login@v1
+
+#       - name: Read the image name
+#         id: image_name
+#         run: echo "::set-output name=image_name::$(cat image_name.txt)"
+
+#       - name: Deploy to Kubernetes
+#         run: |
+#           kubectl set image deployment/my-deployment my-container=${{ steps.image_name.outputs.image_name }} --record
+#           kubectl rollout status deployment/my-deployment
