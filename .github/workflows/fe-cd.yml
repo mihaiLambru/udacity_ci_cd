@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - fe-cd
     paths:
       - 'frontend/**'
   workflow_dispatch:
@@ -17,6 +18,9 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -27,8 +31,7 @@ jobs:
           node-version: '18.14'
 
       - name: Install dependencies
-        working-directory: ./frontend
-        run: npm install
+        run: cd frontend && npm install
 
       - name: Run tests
         working-directory: ./frontend
