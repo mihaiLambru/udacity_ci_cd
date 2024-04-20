@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fe-cd
     paths:
       - 'frontend/**'
   workflow_dispatch:
