@@ -34,8 +34,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Run tests
-        working-directory: ./frontend
-        run: npm test
+        run: cd frontend && npm test
 
   build_and_push:
     needs: test
@@ -44,9 +43,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get short SHA
-        id: sha
-        run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -54,10 +56,12 @@ jobs:
 
       - name: Build, tag, and push image to Amazon ECR
         env:
-          IMAGE_TAG: ${{ steps.sha.outputs.sha }}
-        working-directory: ./frontend
+          REGISTRY: $ECR_REGISTRY
+          REPOSITORY: $IMAGE_REPO_NAME
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+          cd frontend
+          docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 -t $IMAGE_REPO_NAME:$IMAGE_TAG .
           docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
           docker push $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
 
@@ -86,14 +90,31 @@ jobs:
       - name: Set up Kubeconfig
         uses: azure/setup-kubectl@v1
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Read the image name
         id: image_name
         run: echo "::set-output name=image_name::$(cat image_name.txt)"
 
+      - name: Set kubernetes config
+        run: aws eks update-kubeconfig --region us-east-1 --name cluster
+
+      - name: Download & install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+          sudo mv kustomize /usr/local/bin/
+
       - name: Deploy to Kubernetes
         run: |
-          kubectl set image deployment/my-deployment my-container=${{ steps.image_name.outputs.image_name }} --record
-          kubectl rollout status deployment/my-deployment
+          cd frontend/k8s
+          kustomize edit set image frontend=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
+          kustomize build . | kubectl apply -f -
