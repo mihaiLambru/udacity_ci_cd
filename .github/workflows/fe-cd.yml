@@ -1,4 +1,4 @@
-name: Continuous Deployment for Frontend
+name: Frontend Continuous Deployment
 
 on:
   push:
