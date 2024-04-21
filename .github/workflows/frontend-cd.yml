@@ -10,7 +10,6 @@ on:
 
 env:
   IMAGE_REPO_NAME: frontend
-  AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
   REACT_APP_MOVIE_API_URL: "http://localhost:5000"
 

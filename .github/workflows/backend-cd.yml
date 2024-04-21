@@ -9,27 +9,86 @@ on:
   workflow_dispatch:
 env:
   IMAGE_REPO_NAME: backend
-  AWS_REGION: us-east-1
-  AWS_ACCOUNT_ID: 777371055675
-  ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
 jobs:
-  lint-and-test:
+  checkout:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.key }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      id: checkout
+
+    - name: Get cache key
+      id: cache-key
+      run: echo "::set-output name=key::$(echo ${{ hashFiles('**/Pipfile.lock') }})"
+
+  lint:
+    needs: checkout
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./backend
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10'
-      - run: pip install pipenv
-      - run: pipenv install --dev
-      - run: pipenv run lint
-      - run: pipenv run test
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Cache pipenv virtualenv
+      uses: actions/cache@v2
+      with:
+        path: ~/.local/share/virtualenvs
+        key: ${{ needs.checkout.outputs.cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-pipenv-
+
+    - name: Install dependencies
+      run: |
+        pip install pipenv
+        pipenv install --dev
+
+    - name: Lint with Flake8
+      run: pipenv run flake8
+
+  test:
+    needs: checkout
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Cache pipenv virtualenv
+      uses: actions/cache@v2
+      with:
+        path: ~/.local/share/virtualenvs
+        key: ${{ needs.checkout.outputs.cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-pipenv-
+
+    - name: Install dependencies
+      run: |
+        pip install pipenv
+        pipenv install --dev
+
+    - name: Run tests
+      run: pipenv run pytest
 
   build-and-push:
     needs: lint-and-test
@@ -45,7 +104,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: {{ secrets.AWS_REGION }}
         
       - name: Login to Amazon ECR
         id: login-ecr
@@ -56,9 +115,6 @@ jobs:
           docker build -t ${{ env.IMAGE_REPO_NAME }}:${{ github.sha }} ./backend
           docker tag ${{ env.IMAGE_REPO_NAME }}:${{ github.sha }} ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
           docker push ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
-        env:
-          IMAGE_REPO_NAME: backend
-          ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com
           
   deploy:
     needs: build-and-push
@@ -75,7 +131,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: {{ secrets.AWS_REGION }}
 
       - name: Download & install kustomize
         run: |
@@ -83,7 +139,7 @@ jobs:
           sudo mv kustomize /usr/local/bin/
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name cluster
+        run: aws eks update-kubeconfig --region {{ secrets.AWS_REGION }} --name cluster
 
       - name: Deploy to Kubernetes
         run: |
