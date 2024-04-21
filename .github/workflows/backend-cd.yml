@@ -91,7 +91,7 @@ jobs:
       run: pipenv run pytest
 
   build-and-push:
-    needs: lint-and-test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
