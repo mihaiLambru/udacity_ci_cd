@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fe-cd
     paths:
       - 'frontend/**'
   workflow_dispatch:
@@ -34,11 +33,15 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: cd frontend && npm test
+        run: npm test
 
   build_and_push:
     needs: test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -67,7 +70,6 @@ jobs:
           REPOSITORY: $IMAGE_REPO_NAME
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd frontend
           docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 -t $IMAGE_REPO_NAME:$IMAGE_TAG .
           docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
           docker push $ECR_REGISTRY/$IMAGE_REPO_NAME:$IMAGE_TAG
@@ -84,6 +86,10 @@ jobs:
   deploy:
     needs: build_and_push
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -116,6 +122,6 @@ jobs:
 
       - name: Deploy to Kubernetes
         run: |
-          cd frontend/k8s
+          cd k8s
           kustomize edit set image frontend=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
           kustomize build . | kubectl apply -f -
