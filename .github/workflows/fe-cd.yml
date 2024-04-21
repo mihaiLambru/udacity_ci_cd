@@ -97,6 +97,6 @@ jobs:
 
       - name: Deploy to Kubernetes
         run: |
-          cd backend/k8s
-          kustomize edit set image backend=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
+          cd frontend/k8s
+          kustomize edit set image frontend=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
           kustomize build . | kubectl apply -f -
