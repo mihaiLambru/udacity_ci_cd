@@ -11,7 +11,7 @@ env:
   IMAGE_REPO_NAME: backend
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: 777371055675
-  ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com/backend
+  ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com
 
 jobs:
   lint-and-test:
@@ -58,7 +58,7 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
         env:
           IMAGE_REPO_NAME: backend
-          ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com/backend
+          ECR_REGISTRY: 777371055675.dkr.ecr.us-east-1.amazonaws.com
           
   deploy:
     needs: build-and-push
