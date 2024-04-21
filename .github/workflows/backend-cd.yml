@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 env:
   IMAGE_REPO_NAME: backend
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$${{ secrets.AWS_REGION }}.amazonaws.com
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
 jobs:
   checkout:
