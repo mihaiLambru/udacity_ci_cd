@@ -75,25 +75,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Download image name file
-        uses: actions/download-artifact@v2
-        with:
-          name: image_name
-          path: .
-
-      - name: Set up Kubeconfig
+        uses: actions/checkout@v3
+        
+      - name: Set up Kubernetes
         uses: azure/setup-kubectl@v1
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v1
+      - name: Download & install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
 
-      - name: Read the image name
-        id: image_name
-        run: echo "::set-output name=image_name::$(cat image_name.txt)"
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region us-east-1 --name cluster
 
       - name: Deploy to Kubernetes
         run: |
-          kubectl set image deployment/my-deployment my-container=${{ steps.image_name.outputs.image_name }} --record
-          kubectl rollout status deployment/my-deployment
+          cd backend/k8s
+          kustomize edit set image backend=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_REPO_NAME }}:${{ github.sha }}
+          kustomize build . | kubectl apply -f -
